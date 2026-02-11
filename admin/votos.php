@@ -1,155 +1,81 @@
 <?php
+require_once __DIR__ . '/../includes/functions.php';
+requireAdmin();
+$pdo = pdo();
 
-declare(strict_types=1);
-
-require_once __DIR__ . '/../config/auth.php';
-requireAdminLogin();
-
-$pdo = getPDO();
-
-$empresa = trim($_GET['empresa'] ?? '');
-$setor = trim($_GET['setor'] ?? '');
-$dataInicio = trim($_GET['data_inicio'] ?? '');
-$dataFim = trim($_GET['data_fim'] ?? '');
+$empresa = trim((string)($_GET['empresa'] ?? ''));
+$setor = trim((string)($_GET['setor'] ?? ''));
+$di = trim((string)($_GET['data_inicio'] ?? ''));
+$df = trim((string)($_GET['data_fim'] ?? ''));
+$page = max(1, (int)($_GET['page'] ?? 1));
+$perPage = 15;
+$offset = ($page - 1) * $perPage;
 $export = ($_GET['export'] ?? '') === 'csv';
 
-$where = [];
-$params = [];
+$where=[];$params=[];
+if ($empresa !== '') {$where[]='v.eleitor_empresa LIKE :empresa';$params['empresa']='%'.$empresa.'%';}
+if ($setor !== '') {$where[]='v.eleitor_setor LIKE :setor';$params['setor']='%'.$setor.'%';}
+if ($di !== '') {$where[]='DATE(v.created_at)>=:di';$params['di']=$di;}
+if ($df !== '') {$where[]='DATE(v.created_at)<=:df';$params['df']=$df;}
+$whereSql = $where ? (' WHERE '.implode(' AND ',$where)) : '';
 
-if ($empresa !== '') {
-    $where[] = 'v.eleitor_empresa LIKE :empresa';
-    $params['empresa'] = '%' . $empresa . '%';
-}
-if ($setor !== '') {
-    $where[] = 'v.eleitor_setor LIKE :setor';
-    $params['setor'] = '%' . $setor . '%';
-}
-if ($dataInicio !== '') {
-    $where[] = 'DATE(v.created_at) >= :data_inicio';
-    $params['data_inicio'] = $dataInicio;
-}
-if ($dataFim !== '') {
-    $where[] = 'DATE(v.created_at) <= :data_fim';
-    $params['data_fim'] = $dataFim;
-}
+$ranking = $pdo->query('SELECT c.nome, COUNT(v.id) total FROM candidatos c LEFT JOIN votos v ON v.candidato_id=c.id GROUP BY c.id,c.nome ORDER BY total DESC')->fetchAll();
 
-$whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
+$countSql = 'SELECT COUNT(*) FROM votos v' . $whereSql;
+$countStmt = $pdo->prepare($countSql);
+$countStmt->execute($params);
+$total = (int)$countStmt->fetchColumn();
+$totalPages = max(1, (int)ceil($total / $perPage));
 
-$ranking = $pdo->query('SELECT c.nome, COUNT(v.id) AS total_votos
-    FROM candidatos c
-    LEFT JOIN votos v ON v.candidato_id = c.id
-    GROUP BY c.id, c.nome
-    ORDER BY total_votos DESC, c.nome ASC')->fetchAll();
-
-$sqlVotos = 'SELECT v.*, c.nome AS candidato_nome
-    FROM votos v
-    INNER JOIN candidatos c ON c.id = v.candidato_id
-    ' . $whereSql . '
-    ORDER BY v.created_at DESC';
-$stmt = $pdo->prepare($sqlVotos);
+$sql = 'SELECT v.*, c.nome candidato_nome FROM votos v INNER JOIN candidatos c ON c.id=v.candidato_id' . $whereSql . ' ORDER BY v.created_at DESC';
+if (!$export) $sql .= ' LIMIT ' . (int)$perPage . ' OFFSET ' . (int)$offset;
+$stmt = $pdo->prepare($sql);
 $stmt->execute($params);
-$votos = $stmt->fetchAll();
+$rows = $stmt->fetchAll();
 
 if ($export) {
-    header('Content-Type: text/csv; charset=UTF-8');
-    header('Content-Disposition: attachment; filename="relatorio_votos.csv"');
-    $out = fopen('php://output', 'wb');
-    fwrite($out, "\xEF\xBB\xBF");
-    fputcsv($out, ['ID', 'Eleitor', 'CPF', 'Telefone', 'Empresa', 'Setor', 'Candidato', 'Código sorteio', 'Data/Hora'], ';');
-    foreach ($votos as $voto) {
-        fputcsv($out, [
-            $voto['id'],
-            $voto['eleitor_nome'],
-            $voto['eleitor_cpf'],
-            $voto['eleitor_telefone'],
-            $voto['eleitor_empresa'],
-            $voto['eleitor_setor'],
-            $voto['candidato_nome'],
-            $voto['codigo_sorteio'],
-            $voto['created_at'],
-        ], ';');
-    }
-    fclose($out);
-    exit;
+  header('Content-Type: text/csv; charset=UTF-8');
+  header('Content-Disposition: attachment; filename="votos_cipa.csv"');
+  $out = fopen('php://output', 'wb');
+  fwrite($out, "\xEF\xBB\xBF");
+  fputcsv($out, ['ID','Eleitor','CPF','Telefone','Empresa','Setor','Candidato','Código','Data'], ';');
+  foreach ($rows as $r) {
+    fputcsv($out, [$r['id'],$r['eleitor_nome'],$r['eleitor_cpf'],$r['eleitor_telefone'],$r['eleitor_empresa'],$r['eleitor_setor'],$r['candidato_nome'],$r['codigo_sorteio'],$r['created_at']], ';');
+  }
+  fclose($out);exit;
 }
 
-$pageTitle = 'Admin - Relatório de Votos';
+$pageTitle = 'Relatório de Votos';
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<section class="card">
-    <h2>Ranking de votos por candidato</h2>
-    <div class="table-wrap">
-        <table>
-            <thead>
-            <tr>
-                <th>Candidato</th>
-                <th>Total de votos</th>
-            </tr>
-            </thead>
-            <tbody>
-            <?php foreach ($ranking as $item): ?>
-                <tr>
-                    <td><?= e($item['nome']) ?></td>
-                    <td><?= (int) $item['total_votos'] ?></td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-</section>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Relatórios</h1>
+  <a class="btn btn-outline-secondary" href="<?= e(url('admin/dashboard.php')) ?>">Voltar</a>
+</div>
 
-<section class="card">
-    <h2>Lista de votos</h2>
+<div class="card p-3 mb-3 table-responsive">
+  <h2 class="h5">Ranking</h2>
+  <table class="table"><thead><tr><th>Candidato</th><th>Votos</th></tr></thead><tbody><?php foreach($ranking as $r): ?><tr><td><?= e($r['nome']) ?></td><td><?= (int)$r['total'] ?></td></tr><?php endforeach; ?></tbody></table>
+</div>
 
-    <form method="get" class="filters">
-        <label>Empresa
-            <input type="text" name="empresa" value="<?= e($empresa) ?>">
-        </label>
-        <label>Setor
-            <input type="text" name="setor" value="<?= e($setor) ?>">
-        </label>
-        <label>Data inicial
-            <input type="date" name="data_inicio" value="<?= e($dataInicio) ?>">
-        </label>
-        <label>Data final
-            <input type="date" name="data_fim" value="<?= e($dataFim) ?>">
-        </label>
-        <button class="btn btn-primary" type="submit">Filtrar</button>
-        <a class="btn" href="<?= e(url('admin/votos.php')) ?>">Limpar</a>
-        <a class="btn" href="<?= e(url('admin/votos.php')) ?>?<?= http_build_query(array_merge($_GET, ['export' => 'csv'])) ?>">Exportar CSV</a>
-    </form>
+<div class="card p-3 table-responsive">
+  <form class="row g-2 mb-3" method="get">
+    <div class="col-md-3"><input class="form-control" name="empresa" placeholder="Empresa" value="<?= e($empresa) ?>"></div>
+    <div class="col-md-3"><input class="form-control" name="setor" placeholder="Setor" value="<?= e($setor) ?>"></div>
+    <div class="col-md-2"><input class="form-control" type="date" name="data_inicio" value="<?= e($di) ?>"></div>
+    <div class="col-md-2"><input class="form-control" type="date" name="data_fim" value="<?= e($df) ?>"></div>
+    <div class="col-md-2 d-flex gap-2"><button class="btn btn-friato w-100" type="submit">Filtrar</button><a class="btn btn-outline-secondary" href="<?= e(url('admin/votos.php')) ?>">Limpar</a></div>
+  </form>
+  <a class="btn btn-sm btn-outline-dark mb-2" href="<?= e(url('admin/votos.php?' . http_build_query(array_merge($_GET,['export'=>'csv'])))) ?>">Exportar CSV</a>
+  <table class="table table-hover align-middle">
+    <thead><tr><th>ID</th><th>Eleitor</th><th>CPF</th><th>Telefone</th><th>Empresa</th><th>Setor</th><th>Candidato</th><th>Código</th><th>Data</th></tr></thead>
+    <tbody><?php foreach($rows as $v): ?><tr><td><?= (int)$v['id'] ?></td><td><?= e($v['eleitor_nome']) ?></td><td><?= e(formatCpf($v['eleitor_cpf'])) ?></td><td><?= e($v['eleitor_telefone']) ?></td><td><?= e($v['eleitor_empresa']) ?></td><td><?= e($v['eleitor_setor']) ?></td><td><?= e($v['candidato_nome']) ?></td><td><?= e($v['codigo_sorteio']) ?></td><td><?= e($v['created_at']) ?></td></tr><?php endforeach; ?></tbody>
+  </table>
 
-    <div class="table-wrap">
-        <table>
-            <thead>
-            <tr>
-                <th>ID</th>
-                <th>Eleitor</th>
-                <th>CPF</th>
-                <th>Telefone</th>
-                <th>Empresa</th>
-                <th>Setor</th>
-                <th>Candidato</th>
-                <th>Código</th>
-                <th>Data/Hora</th>
-            </tr>
-            </thead>
-            <tbody>
-            <?php foreach ($votos as $voto): ?>
-                <tr>
-                    <td><?= (int) $voto['id'] ?></td>
-                    <td><?= e($voto['eleitor_nome']) ?></td>
-                    <td><?= e(formatCpf($voto['eleitor_cpf'])) ?></td>
-                    <td><?= e($voto['eleitor_telefone']) ?></td>
-                    <td><?= e($voto['eleitor_empresa']) ?></td>
-                    <td><?= e($voto['eleitor_setor']) ?></td>
-                    <td><?= e($voto['candidato_nome']) ?></td>
-                    <td><?= e($voto['codigo_sorteio']) ?></td>
-                    <td><?= e($voto['created_at']) ?></td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-</section>
+  <nav><ul class="pagination">
+    <?php for($p=1;$p<=$totalPages;$p++): ?>
+      <li class="page-item <?= $p===$page?'active':'' ?>"><a class="page-link" href="<?= e(url('admin/votos.php?' . http_build_query(array_merge($_GET,['page'=>$p])))) ?>"><?= $p ?></a></li>
+    <?php endfor; ?>
+  </ul></nav>
+</div>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

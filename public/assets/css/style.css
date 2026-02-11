@@ -1,0 +1,31 @@
+:root {
+  --friato-red: #DA291C;
+  --friato-gold: #FFC600;
+  --neutral-900: #111827;
+  --neutral-700: #374151;
+  --neutral-100: #F3F4F6;
+  --white: #FFFFFF;
+}
+body { background: var(--neutral-100); color: var(--neutral-900); }
+.friato-navbar { background: linear-gradient(90deg, var(--friato-red), #b61f14); box-shadow: 0 8px 20px rgba(0,0,0,.12); }
+.logo-sm { width: 34px; height: 34px; object-fit: contain; }
+.logo-placeholder { display:flex; align-items:center; justify-content:center; background:#fff; color:var(--neutral-700); border:1px dashed #cbd5e1; border-radius:10px; }
+.logo-hero { width: 140px; height: 70px; }
+.hero-card,.glass-card,.kpi-card,.step-card,.candidate-card { border:0; border-radius:18px; box-shadow: 0 10px 30px rgba(17,24,39,.08); }
+.hero-title { font-weight: 800; letter-spacing: -.5px; }
+.btn-friato { background: var(--friato-red); color:#fff; border:none; }
+.btn-friato:hover { background: #b61f14; color:#fff; }
+.btn-gold { background: var(--friato-gold); color: var(--neutral-900); border:none; }
+.stepper { display:flex; gap:10px; margin-bottom: 20px; }
+.step { flex:1; height:10px; background:#e5e7eb; border-radius:99px; }
+.step.active { background: var(--friato-red); }
+.step.done { background: #16a34a; }
+.wizard-pane { display:none; }
+.wizard-pane.active { display:block; }
+.candidate-card { padding: 1rem; text-align:center; cursor:pointer; transition: .2s ease; background:#fff; }
+.candidate-card:hover { transform: translateY(-2px); }
+.candidate-card.selected { outline: 2px solid var(--friato-red); }
+.candidate-photo { width: 88px; height:88px; border-radius: 50%; object-fit: cover; margin: 0 auto 10px; background:#e5e7eb; }
+.number-huge { font-size: clamp(3rem, 8vw, 6.6rem); font-weight: 900; color: var(--friato-red); line-height:1; }
+.table thead th { background: #111827; color:#fff; }
+.footer { background:#fff; border-top:1px solid #e5e7eb; }

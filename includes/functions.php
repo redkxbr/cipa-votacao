@@ -2,142 +2,158 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/db.php';
+
 function e(?string $value): string
 {
     return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 }
 
-
 function url(string $path = ''): string
 {
     $base = rtrim(BASE_URL, '/');
-    $path = '/' . ltrim($path, '/');
-    return ($base === '' ? '' : $base) . $path;
+    return $base . '/' . ltrim($path, '/');
 }
+
 function redirect(string $path): void
 {
     header('Location: ' . $path);
     exit;
 }
 
-function onlyDigits(string $value): string
+function digits(string $value): string
 {
     return preg_replace('/\D+/', '', $value) ?? '';
 }
 
-function validarCPF(string $cpf): bool
+function validateCPF(string $cpf): bool
 {
-    $cpf = onlyDigits($cpf);
-
+    $cpf = digits($cpf);
     if (strlen($cpf) !== 11 || preg_match('/^(\d)\1{10}$/', $cpf)) {
         return false;
     }
-
     for ($t = 9; $t < 11; $t++) {
         $sum = 0;
         for ($i = 0; $i < $t; $i++) {
             $sum += (int) $cpf[$i] * (($t + 1) - $i);
         }
-
-        $digit = ((10 * $sum) % 11) % 10;
-        if ((int) $cpf[$t] !== $digit) {
+        $d = ((10 * $sum) % 11) % 10;
+        if ((int) $cpf[$t] !== $d) {
             return false;
         }
     }
-
     return true;
 }
 
-function validarTelefone(string $telefone): bool
+function validatePhone(string $phone): bool
 {
-    $telefone = onlyDigits($telefone);
-    $len = strlen($telefone);
+    $len = strlen(digits($phone));
     return $len >= 10 && $len <= 11;
 }
 
-function formatCpfMaskPublic(string $cpf): string
+function maskCpfPublic(string $cpf): string
 {
     return '***.***.***-**';
 }
 
 function formatCpf(string $cpf): string
 {
-    $cpf = str_pad(onlyDigits($cpf), 11, '0', STR_PAD_LEFT);
+    $cpf = str_pad(digits($cpf), 11, '0', STR_PAD_LEFT);
     return substr($cpf, 0, 3) . '.' . substr($cpf, 3, 3) . '.' . substr($cpf, 6, 3) . '-' . substr($cpf, 9, 2);
 }
 
-function setFlash(string $type, string $message): void
+function flash(string $type, string $message): void
 {
-    $_SESSION['flash'] = [
-        'type' => $type,
-        'message' => $message,
-    ];
+    $_SESSION['flash'] = ['type' => $type, 'message' => $message];
 }
 
-function getFlash(): ?array
+function pullFlash(): ?array
 {
     if (empty($_SESSION['flash'])) {
         return null;
     }
-
-    $flash = $_SESSION['flash'];
+    $f = $_SESSION['flash'];
     unset($_SESSION['flash']);
-
-    return $flash;
+    return $f;
 }
 
-function generateUniqueLotteryCode(PDO $pdo): string
+function isAdminLogged(): bool
 {
-    $attempts = 0;
-
-    do {
-        $attempts++;
-        $codigo = str_pad((string) random_int(10000, 99999), 5, '0', STR_PAD_LEFT);
-        $stmt = $pdo->prepare('SELECT COUNT(*) FROM votos WHERE codigo_sorteio = :codigo');
-        $stmt->execute(['codigo' => $codigo]);
-        $exists = (int) $stmt->fetchColumn() > 0;
-    } while ($exists && $attempts < 30);
-
-    if ($exists) {
-        throw new RuntimeException('Não foi possível gerar um código único de sorteio.');
-    }
-
-    return $codigo;
+    return !empty($_SESSION['admin_id']);
 }
 
-function saveCandidatePhoto(array $file, string $uploadDir, string $prefix = 'candidato'): string
+function requireAdmin(): void
+{
+    if (!isAdminLogged()) {
+        flash('warning', 'Faça login para acessar o painel.');
+        redirect(url('admin/login.php'));
+    }
+}
+
+function doAdminLogin(string $username, string $password): bool
+{
+    $stmt = pdo()->prepare('SELECT id, username, password_hash FROM admins WHERE username = :u LIMIT 1');
+    $stmt->execute(['u' => $username]);
+    $admin = $stmt->fetch();
+    if (!$admin || !password_verify($password, $admin['password_hash'])) {
+        return false;
+    }
+    $_SESSION['admin_id'] = (int) $admin['id'];
+    $_SESSION['admin_username'] = $admin['username'];
+    return true;
+}
+
+function uploadCandidatePhoto(array $file): string
 {
     if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-        throw new RuntimeException('Falha no upload da foto.');
+        throw new RuntimeException('Falha no upload da imagem.');
     }
-
     if (($file['size'] ?? 0) > MAX_UPLOAD_SIZE) {
-        throw new RuntimeException('A foto deve ter no máximo 2MB.');
+        throw new RuntimeException('A imagem deve ter no máximo 2MB.');
     }
 
-    $allowedMime = [
-        'image/jpeg' => 'jpg',
-        'image/png' => 'png',
-    ];
-
+    $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png'];
     $finfo = new finfo(FILEINFO_MIME_TYPE);
     $mime = $finfo->file($file['tmp_name']);
-
-    if (!isset($allowedMime[$mime])) {
-        throw new RuntimeException('Formato de foto inválido. Use JPG ou PNG.');
+    if (!isset($allowed[$mime])) {
+        throw new RuntimeException('Formato inválido. Use JPG ou PNG.');
     }
 
-    if (!is_dir($uploadDir) && !mkdir($uploadDir, 0775, true) && !is_dir($uploadDir)) {
-        throw new RuntimeException('Não foi possível criar a pasta de upload.');
+    $dir = __DIR__ . '/../public/uploads/candidatos';
+    if (!is_dir($dir)) {
+        mkdir($dir, 0775, true);
     }
 
-    $extension = $allowedMime[$mime];
-    $filename = $prefix . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $extension;
-    $destination = rtrim($uploadDir, '/') . '/' . $filename;
+    $name = 'cand_' . time() . '_' . bin2hex(random_bytes(6)) . '.' . $allowed[$mime];
+    $target = $dir . '/' . $name;
+    if (!move_uploaded_file($file['tmp_name'], $target)) {
+        throw new RuntimeException('Não foi possível salvar a imagem.');
+    }
+    return $name;
+}
 
-    if (!move_uploaded_file($file['tmp_name'], $destination)) {
-        throw new RuntimeException('Não foi possível salvar a foto enviada.');
+function uniqueLotteryCode(PDO $pdo): string
+{
+    for ($i = 0; $i < 40; $i++) {
+        $code = (string) random_int(10000, 99999);
+        $q = $pdo->prepare('SELECT 1 FROM votos WHERE codigo_sorteio = :c LIMIT 1');
+        $q->execute(['c' => $code]);
+        if (!$q->fetch()) {
+            return $code;
+        }
+    }
+    throw new RuntimeException('Não foi possível gerar código único.');
+}
+
+function logoOrPlaceholder(string $path, string $label, string $class = 'logo'): string
+{
+    $file = basename($path);
+    $full = __DIR__ . '/../public/assets/img/' . $file;
+
+    $isRealImage = is_file($full) && @getimagesize($full) !== false;
+    if ($isRealImage) {
+        return '<img class="' . e($class) . '" src="' . e(url('public/assets/img/' . $file)) . '" alt="' . e($label) . '">';
     }
 
-    return $filename;
+    return '<div class="logo-placeholder ' . e($class) . '">' . e($label) . '</div>';
 }

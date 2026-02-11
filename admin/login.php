@@ -1,40 +1,37 @@
 <?php
+require_once __DIR__ . '/../includes/functions.php';
 
-declare(strict_types=1);
-
-require_once __DIR__ . '/../config/auth.php';
-
-if (isAdminLoggedIn()) {
-    redirect(url('admin/dashboard.php'));
+if (isAdminLogged()) {
+  redirect(url('admin/dashboard.php'));
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = trim($_POST['username'] ?? '');
-    $password = (string) ($_POST['password'] ?? '');
-
-    if ($username === '' || $password === '') {
-        setFlash('error', 'Informe usuário e senha.');
-    } elseif (!adminLogin($username, $password)) {
-        setFlash('error', 'Credenciais inválidas.');
-    } else {
-        setFlash('success', 'Login efetuado com sucesso.');
-        redirect(url('admin/dashboard.php'));
-    }
+  $user = trim((string)($_POST['username'] ?? ''));
+  $pass = (string)($_POST['password'] ?? '');
+  if ($user === '' || $pass === '') {
+    flash('warning', 'Informe usuário e senha.');
+  } elseif (!doAdminLogin($user, $pass)) {
+    flash('error', 'Credenciais inválidas.');
+  } else {
+    flash('success', 'Bem-vindo ao painel administrativo.');
+    redirect(url('admin/dashboard.php'));
+  }
 }
 
-$pageTitle = 'Login Admin';
+$pageTitle = 'Admin Login';
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<section class="card auth-card">
-    <h2>Admin - Login</h2>
-    <form method="post" class="vote-form">
-        <label>Usuário
-            <input type="text" name="username" required>
-        </label>
-        <label>Senha
-            <input type="password" name="password" required>
-        </label>
-        <button class="btn btn-primary" type="submit">Entrar</button>
-    </form>
-</section>
+<div class="row justify-content-center">
+  <div class="col-md-6 col-lg-4">
+    <div class="card hero-card p-4">
+      <div class="text-center mb-3"><?= logoOrPlaceholder('logo-friato.png', 'Logo Friato', 'logo-hero mx-auto') ?></div>
+      <h1 class="h4 text-center mb-3">Acesso Administrativo</h1>
+      <form method="post" class="vstack gap-3">
+        <input class="form-control" name="username" placeholder="Usuário" required>
+        <input class="form-control" name="password" type="password" placeholder="Senha" required>
+        <button class="btn btn-friato" type="submit">Entrar</button>
+      </form>
+    </div>
+  </div>
+</div>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

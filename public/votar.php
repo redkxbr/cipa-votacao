@@ -1,196 +1,137 @@
 <?php
-
-declare(strict_types=1);
-
-require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../includes/functions.php';
 
-$pdo = getPDO();
-$errors = [];
-$data = [
-    'nome' => '',
-    'cpf' => '',
-    'telefone' => '',
-    'empresa' => '',
-    'setor' => '',
-    'candidato_id' => '',
-];
-$showConfirmation = false;
+$pdo = pdo();
+$candidates = $pdo->query('SELECT id, nome, cpf, foto_path FROM candidatos WHERE ativo = 1 ORDER BY nome')->fetchAll();
 
-$candidates = $pdo->query('SELECT id, nome, cpf, foto_path FROM candidatos WHERE ativo = 1 ORDER BY nome ASC')->fetchAll();
+$data = [
+  'nome' => '', 'cpf' => '', 'telefone' => '', 'empresa' => '', 'setor' => '', 'candidato_id' => '', 'current_step' => '1'
+];
+$serverError = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $data['nome'] = trim($_POST['nome'] ?? '');
-    $data['cpf'] = trim($_POST['cpf'] ?? '');
-    $data['telefone'] = trim($_POST['telefone'] ?? '');
-    $data['empresa'] = trim($_POST['empresa'] ?? '');
-    $data['setor'] = trim($_POST['setor'] ?? '');
-    $data['candidato_id'] = trim($_POST['candidato_id'] ?? '');
+  foreach ($data as $k => $v) {
+    $data[$k] = trim((string)($_POST[$k] ?? ''));
+  }
 
-    if ($data['nome'] === '') {
-        $errors[] = 'Nome é obrigatório.';
-    }
+  $cpf = digits($data['cpf']);
+  $phone = digits($data['telefone']);
 
-    if (!validarCPF($data['cpf'])) {
-        $errors[] = 'CPF inválido.';
-    }
+  if ($data['nome'] === '' || $cpf === '' || $phone === '' || $data['empresa'] === '' || $data['setor'] === '' || $data['candidato_id'] === '') {
+    $serverError = 'Preencha todos os campos obrigatórios para concluir o voto.';
+    $data['current_step'] = '4';
+  } elseif (!validateCPF($cpf)) {
+    $serverError = 'CPF inválido. Verifique e tente novamente.';
+    $data['current_step'] = '2';
+  } elseif (!validatePhone($phone)) {
+    $serverError = 'Telefone inválido. Informe 10 ou 11 dígitos.';
+    $data['current_step'] = '3';
+  } else {
+    $check = $pdo->prepare('SELECT 1 FROM votos WHERE eleitor_cpf = :cpf LIMIT 1');
+    $check->execute(['cpf' => $cpf]);
+    if ($check->fetch()) {
+      $serverError = 'Este CPF já votou.';
+      $data['current_step'] = '2';
+    } else {
+      try {
+        $pdo->beginTransaction();
+        $code = uniqueLotteryCode($pdo);
+        $token = bin2hex(random_bytes(16));
 
-    if (!validarTelefone($data['telefone'])) {
-        $errors[] = 'Telefone inválido. Informe 10 ou 11 dígitos.';
-    }
-
-    if ($data['empresa'] === '') {
-        $errors[] = 'Empresa é obrigatória.';
-    }
-
-    if ($data['setor'] === '') {
-        $errors[] = 'Setor é obrigatório.';
-    }
-
-    if ($data['candidato_id'] === '' || !ctype_digit($data['candidato_id'])) {
-        $errors[] = 'Selecione um candidato.';
-    }
-
-    $cpfNumerico = onlyDigits($data['cpf']);
-
-    if (empty($errors)) {
-        $checkVoto = $pdo->prepare('SELECT id FROM votos WHERE eleitor_cpf = :cpf LIMIT 1');
-        $checkVoto->execute(['cpf' => $cpfNumerico]);
-        if ($checkVoto->fetch()) {
-            $errors[] = 'Este CPF já votou.';
+        $stmt = $pdo->prepare('INSERT INTO votos (eleitor_nome, eleitor_cpf, eleitor_telefone, eleitor_empresa, eleitor_setor, candidato_id, codigo_sorteio, token)
+                               VALUES (:n,:cpf,:t,:e,:s,:c,:code,:token)');
+        $stmt->execute([
+          'n' => $data['nome'],
+          'cpf' => $cpf,
+          't' => $phone,
+          'e' => $data['empresa'],
+          's' => $data['setor'],
+          'c' => (int)$data['candidato_id'],
+          'code' => $code,
+          'token' => $token,
+        ]);
+        $pdo->commit();
+        flash('success', 'Voto confirmado com sucesso!');
+        redirect(url('public/finalizar.php?token=' . urlencode($token)));
+      } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+          $pdo->rollBack();
         }
+        $serverError = ((int)$e->getCode() === 23000) ? 'Este CPF já votou.' : 'Não foi possível concluir seu voto agora.';
+      }
     }
-
-    if (empty($errors) && !isset($_POST['confirmar'])) {
-        $showConfirmation = true;
-    }
-
-    if (empty($errors) && isset($_POST['confirmar'])) {
-        try {
-            $pdo->beginTransaction();
-
-            $codigoSorteio = generateUniqueLotteryCode($pdo);
-            $insert = $pdo->prepare('INSERT INTO votos (
-                eleitor_nome,
-                eleitor_cpf,
-                eleitor_telefone,
-                eleitor_empresa,
-                eleitor_setor,
-                candidato_id,
-                codigo_sorteio
-            ) VALUES (
-                :eleitor_nome,
-                :eleitor_cpf,
-                :eleitor_telefone,
-                :eleitor_empresa,
-                :eleitor_setor,
-                :candidato_id,
-                :codigo_sorteio
-            )');
-
-            $insert->execute([
-                'eleitor_nome' => $data['nome'],
-                'eleitor_cpf' => $cpfNumerico,
-                'eleitor_telefone' => onlyDigits($data['telefone']),
-                'eleitor_empresa' => $data['empresa'],
-                'eleitor_setor' => $data['setor'],
-                'candidato_id' => (int) $data['candidato_id'],
-                'codigo_sorteio' => $codigoSorteio,
-            ]);
-
-            $voteId = (int) $pdo->lastInsertId();
-            $pdo->commit();
-
-            $token = base64_encode(hash_hmac('sha256', (string) $voteId, APP_KEY, true));
-            redirect(url('public/finalizar.php') . '?v=' . $voteId . '&t=' . urlencode($token));
-        } catch (Throwable $e) {
-            if ($pdo->inTransaction()) {
-                $pdo->rollBack();
-            }
-            if ((int) $e->getCode() === 23000) {
-                $errors[] = 'Este CPF já votou.';
-            } else {
-                $errors[] = 'Erro ao registrar voto. Tente novamente.';
-            }
-        }
-    }
+  }
 }
 
-$pageTitle = 'Votação CIPA';
+$pageTitle = 'Votação CIPA (Wizard)';
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<section class="card">
-    <h2>Formulário de votação</h2>
+<?php if ($serverError): ?>
+<script>
+document.addEventListener('DOMContentLoaded',()=>Swal.fire({icon:'error',text:'<?= e($serverError) ?>',confirmButtonColor:'#DA291C'}));
+</script>
+<?php endif; ?>
 
-    <?php if ($errors): ?>
-        <div class="alert alert-error">
-            <ul>
-                <?php foreach ($errors as $error): ?>
-                    <li><?= e($error) ?></li>
-                <?php endforeach; ?>
-            </ul>
-        </div>
-    <?php endif; ?>
+<div class="card step-card p-4" data-wizard>
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h2 class="h4 mb-0">Wizard de Votação</h2>
+    <span class="badge text-bg-dark">4 etapas</span>
+  </div>
+  <div class="stepper">
+    <div class="step"></div><div class="step"></div><div class="step"></div><div class="step"></div>
+  </div>
 
-    <?php if (empty($candidates)): ?>
-        <p>Nenhum candidato ativo cadastrado no momento.</p>
-    <?php else: ?>
-        <?php if ($showConfirmation): ?>
-            <div class="card card-confirm">
-                <h3>Confirme seus dados</h3>
-                <p><strong>Nome:</strong> <?= e($data['nome']) ?></p>
-                <p><strong>CPF:</strong> <?= e(formatCpfMaskPublic($data['cpf'])) ?></p>
-                <p><strong>Telefone:</strong> <?= e($data['telefone']) ?></p>
-                <p><strong>Empresa:</strong> <?= e($data['empresa']) ?></p>
-                <p><strong>Setor:</strong> <?= e($data['setor']) ?></p>
-                <form method="post">
-                    <?php foreach ($data as $key => $value): ?>
-                        <input type="hidden" name="<?= e($key) ?>" value="<?= e($value) ?>">
-                    <?php endforeach; ?>
-                    <input type="hidden" name="confirmar" value="1">
-                    <button type="submit" class="btn btn-primary">Confirmar voto</button>
-                    <a class="btn" href="<?= e(url('public/votar.php')) ?>">Editar dados</a>
-                </form>
-            </div>
-        <?php else: ?>
-            <form method="post" class="vote-form">
-                <label>Nome*
-                    <input type="text" name="nome" value="<?= e($data['nome']) ?>" required>
-                </label>
-                <label>CPF*
-                    <input type="text" name="cpf" value="<?= e($data['cpf']) ?>" required>
-                </label>
-                <label>Telefone*
-                    <input type="text" name="telefone" value="<?= e($data['telefone']) ?>" required>
-                </label>
-                <label>Empresa*
-                    <input type="text" name="empresa" value="<?= e($data['empresa']) ?>" required>
-                </label>
-                <label>Setor*
-                    <input type="text" name="setor" value="<?= e($data['setor']) ?>" required>
-                </label>
+  <form method="post">
+    <input type="hidden" name="current_step" value="<?= e($data['current_step']) ?>">
 
-                <h3>Escolha um candidato</h3>
-                <div class="candidate-grid">
-                    <?php foreach ($candidates as $candidate): ?>
-                        <label class="candidate-card">
-                            <input
-                                type="radio"
-                                name="candidato_id"
-                                value="<?= (int) $candidate['id'] ?>"
-                                <?= $data['candidato_id'] === (string) $candidate['id'] ? 'checked' : '' ?>
-                                required
-                            >
-                            <img src="<?= e(url('public/uploads/candidatos')) ?>/<?= e($candidate['foto_path']) ?>" alt="Foto de <?= e($candidate['nome']) ?>">
-                            <strong><?= e($candidate['nome']) ?></strong>
-                            <small>CPF: <?= e(formatCpfMaskPublic($candidate['cpf'])) ?></small>
-                        </label>
-                    <?php endforeach; ?>
-                </div>
+    <section class="wizard-pane">
+      <h3 class="h5">1) Instruções</h3>
+      <p class="text-secondary">Você informará seus dados, escolherá 1 candidato e receberá seu número único para sorteio.</p>
+      <button type="button" class="btn btn-friato" data-next>Continuar</button>
+    </section>
 
-                <button type="submit" class="btn btn-primary">Continuar para confirmação</button>
-            </form>
-        <?php endif; ?>
-    <?php endif; ?>
-</section>
+    <section class="wizard-pane">
+      <h3 class="h5">2) Identificação</h3>
+      <div class="row g-3">
+        <div class="col-md-7"><label class="form-label">Nome*</label><input class="form-control" type="text" name="nome" value="<?= e($data['nome']) ?>"></div>
+        <div class="col-md-5"><label class="form-label">CPF*</label><input class="form-control" type="text" name="cpf" value="<?= e($data['cpf']) ?>" placeholder="000.000.000-00"></div>
+      </div>
+      <div class="mt-3 d-flex gap-2"><button type="button" class="btn btn-outline-secondary" data-prev>Voltar</button><button type="button" class="btn btn-friato" data-next>Continuar</button></div>
+    </section>
+
+    <section class="wizard-pane">
+      <h3 class="h5">3) Contato e Lotação</h3>
+      <div class="row g-3">
+        <div class="col-md-4"><label class="form-label">Telefone*</label><input class="form-control" type="text" name="telefone" value="<?= e($data['telefone']) ?>" placeholder="(00) 00000-0000"></div>
+        <div class="col-md-4"><label class="form-label">Empresa*</label><input class="form-control" type="text" name="empresa" value="<?= e($data['empresa']) ?>"></div>
+        <div class="col-md-4"><label class="form-label">Setor*</label><input class="form-control" type="text" name="setor" value="<?= e($data['setor']) ?>"></div>
+      </div>
+      <div class="mt-3 d-flex gap-2"><button type="button" class="btn btn-outline-secondary" data-prev>Voltar</button><button type="button" class="btn btn-friato" data-next>Continuar</button></div>
+    </section>
+
+    <section class="wizard-pane">
+      <h3 class="h5">4) Escolha seu candidato</h3>
+      <div class="row g-3 mt-1">
+        <?php foreach ($candidates as $c): ?>
+          <div class="col-md-4">
+            <label class="candidate-card w-100 <?= $data['candidato_id'] === (string)$c['id'] ? 'selected' : '' ?>">
+              <?php if (!empty($c['foto_path'])): ?>
+                <img class="candidate-photo" src="<?= e(url('public/uploads/candidatos/' . $c['foto_path'])) ?>" alt="<?= e($c['nome']) ?>">
+              <?php else: ?>
+                <div class="candidate-photo d-flex align-items-center justify-content-center">Sem foto</div>
+              <?php endif; ?>
+              <div class="fw-semibold"><?= e($c['nome']) ?></div>
+              <small class="text-muted">CPF: <?= e(maskCpfPublic($c['cpf'])) ?></small>
+              <div class="form-check mt-2 d-flex justify-content-center">
+                <input class="form-check-input" type="radio" name="candidato_id" value="<?= (int)$c['id'] ?>" <?= $data['candidato_id'] === (string)$c['id'] ? 'checked' : '' ?>>
+              </div>
+            </label>
+          </div>
+        <?php endforeach; ?>
+      </div>
+      <div class="mt-3 d-flex gap-2"><button type="button" class="btn btn-outline-secondary" data-prev>Voltar</button><button type="submit" class="btn btn-friato">Confirmar voto</button></div>
+    </section>
+  </form>
+</div>
+
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
