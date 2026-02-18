@@ -10,9 +10,7 @@ CREATE TABLE IF NOT EXISTS candidatos (
   foto_path VARCHAR(255) DEFAULT NULL,
   ativo TINYINT(1) NOT NULL DEFAULT 1,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_candidatos_ativo (ativo),
-  INDEX idx_candidatos_turno (turno),
-  INDEX idx_candidatos_setor (setor)
+  INDEX idx_candidatos_ativo (ativo)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS admins (
@@ -27,14 +25,47 @@ CREATE TABLE IF NOT EXISTS eleitores_autorizados (
   nome VARCHAR(150) NOT NULL,
   cpf VARCHAR(11) NOT NULL UNIQUE,
   empresa VARCHAR(150) NOT NULL,
+  gerencia VARCHAR(150) NOT NULL DEFAULT '',
+  supervisao VARCHAR(150) NOT NULL DEFAULT '',
+  nome_cc VARCHAR(150) NOT NULL DEFAULT '',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_eleitores_empresa (empresa)
+  INDEX idx_eleitores_empresa (empresa),
+  INDEX idx_eleitores_gerencia (gerencia),
+  INDEX idx_eleitores_supervisao (supervisao),
+  INDEX idx_eleitores_nome_cc (nome_cc)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS eleicoes (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  nome VARCHAR(200) NOT NULL,
+  slug VARCHAR(100) NOT NULL UNIQUE,
+  descricao TEXT NULL,
+  justificativa_negacao TEXT NULL,
+  periodo_inicio DATETIME NOT NULL,
+  periodo_fim DATETIME NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_eleicoes_periodo (periodo_inicio, periodo_fim)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS eleicao_permissoes (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  eleicao_id INT UNSIGNED NOT NULL,
+  tipo ENUM('gerencia','supervisao','nome_cc') NOT NULL,
+  valor VARCHAR(150) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_eleicao_permissao (eleicao_id, tipo, valor),
+  INDEX idx_eleicao_perm_tipo_valor (tipo, valor),
+  CONSTRAINT fk_eleicao_perm_eleicao FOREIGN KEY (eleicao_id)
+    REFERENCES eleicoes(id)
+    ON UPDATE CASCADE
+    ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS votos (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  eleicao_id INT UNSIGNED NOT NULL,
   eleitor_nome VARCHAR(150) NOT NULL,
-  eleitor_cpf VARCHAR(11) NOT NULL UNIQUE,
+  eleitor_cpf VARCHAR(11) NOT NULL,
   eleitor_turno VARCHAR(30) NOT NULL,
   eleitor_telefone VARCHAR(11) NOT NULL,
   eleitor_empresa VARCHAR(150) NOT NULL,
@@ -43,12 +74,14 @@ CREATE TABLE IF NOT EXISTS votos (
   codigo_sorteio VARCHAR(5) NOT NULL UNIQUE,
   token VARCHAR(64) NOT NULL UNIQUE,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_voto_eleicao_cpf (eleicao_id, eleitor_cpf),
+  INDEX idx_votos_eleicao (eleicao_id),
   INDEX idx_votos_candidato (candidato_id),
-  INDEX idx_votos_empresa (eleitor_empresa),
-  INDEX idx_votos_setor (eleitor_setor),
-  INDEX idx_votos_turno (eleitor_turno),
   INDEX idx_votos_codigo (codigo_sorteio),
-  INDEX idx_votos_created_at (created_at),
+  CONSTRAINT fk_votos_eleicao FOREIGN KEY (eleicao_id)
+    REFERENCES eleicoes(id)
+    ON UPDATE CASCADE
+    ON DELETE RESTRICT,
   CONSTRAINT fk_votos_candidato FOREIGN KEY (candidato_id)
     REFERENCES candidatos(id)
     ON UPDATE CASCADE

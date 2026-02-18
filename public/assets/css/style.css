@@ -225,3 +225,90 @@ body {
     backdrop-filter: none;
   }
 }
+
+/* Sorteio - visual de palco */
+.sorteio-stage {
+  background: linear-gradient(165deg, #fff7f6 0%, #ffe9e6 100%);
+  border: 1px solid #fecaca;
+}
+.draw-animation {
+  text-align: center;
+  padding: 18px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px dashed #fca5a5;
+}
+.countdown {
+  font-size: clamp(2.5rem, 12vw, 5rem);
+  font-weight: 900;
+  color: var(--friato-red-dark);
+  line-height: 1;
+  margin-bottom: 8px;
+}
+.fake-code,
+.winner-code {
+  font-size: clamp(2.2rem, 13vw, 6rem);
+  font-weight: 900;
+  letter-spacing: .14em;
+  color: var(--friato-red);
+  text-shadow: 0 8px 18px rgba(218,41,28,.28);
+}
+.winner-card {
+  padding: 20px 14px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #fff5f3 100%);
+  border: 1px solid #fca5a5;
+  box-shadow: 0 16px 34px rgba(183,31,21,.22);
+}
+.winner-badge {
+  display: inline-block;
+  font-size: .8rem;
+  letter-spacing: .08em;
+  font-weight: 800;
+  color: #7f1d1d;
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  border-radius: 999px;
+  padding: 6px 12px;
+  margin-bottom: 10px;
+}
+.winner-name {
+  font-size: clamp(1.3rem, 6vw, 2.2rem);
+  font-weight: 900;
+  color: var(--friato-red-deep);
+}
+.winner-meta {
+  display: inline-block;
+  text-align: left;
+  background: #fff;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.sensitive-field {
+  display: inline-block;
+  background: #111827;
+  color: #fff;
+  border-radius: 10px;
+  padding: 8px 12px;
+  min-width: 240px;
+}
+
+@media (min-width: 1200px) {
+  .sorteio-stage {
+    min-height: 72vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .winner-name {
+    font-size: clamp(2rem, 4vw, 3.4rem);
+  }
+  .winner-code {
+    font-size: clamp(3rem, 8vw, 8rem);
+  }
+}
+
+:fullscreen .no-print {
+  display: none !important;
+}

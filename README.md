@@ -27,6 +27,7 @@ Sistema de votação com UI moderna, wizard/stepper em 4 etapas, área administr
   dashboard.php
   candidatos.php
   eleitores.php
+  eleicoes.php
   votos.php
   sorteio.php
 /includes
@@ -91,9 +92,10 @@ Após voto:
 
 ## Regras adicionais implementadas
 - Apenas eleitores importados em `eleitores_autorizados` podem votar.
-- Importação de eleitores via CSV no admin (`nome,cpf,empresa`).
+- Importação de eleitores via CSV no admin (`nome,cpf,empresa,gerencia,supervisao,nome_cc`).
 - Cadastro de candidatos com campos extras: `turno` e `setor`.
 - Página de sorteio no admin para selecionar aleatoriamente um votante pelo código.
+- Sorteio admin com animação de contagem/revelação, modo tela cheia e exibição protegida de CPF/voto (revelação sob clique).
 - Relatório de votos com filtro por código de sorteio e exportações CSV separadas:
   - votos
   - candidatos + total de votos
@@ -102,7 +104,7 @@ Após voto:
 ## Importação de eleitores (CSV)
 - Tela: `admin/eleitores.php`
 - Clique em **Baixar modelo CSV** para usar o formato correto.
-- Colunas esperadas (ordem): `nome,cpf,empresa`.
+- Colunas esperadas (ordem): `nome,cpf,empresa,gerencia,supervisao,nome_cc`.
 - Opções na tela:
   - marcar/desmarcar se a 1ª linha é cabeçalho;
   - escolher separador `,` ou `;`.
@@ -110,5 +112,21 @@ Após voto:
 
 Exemplo de cabeçalho:
 ```csv
-nome,cpf,empresa
+nome,cpf,empresa,gerencia,supervisao,nome_cc
 ```
+
+
+## Gestão de Eleições (novo)
+- Crie eleições em `admin/eleicoes.php` com:
+  - nome (ex.: Eleição CIPA Friato 2026)
+  - período início/fim
+  - descrição pública
+  - justificativa para não elegíveis
+- Ao criar, o sistema gera um **link de compartilhamento** com slug, ex:
+  - `public/votar.php?eleicao=eleicao-cipa-friato-2026`
+- Permissões da eleição podem ser definidas por grupos de eleitores:
+  - `gerencia`
+  - `supervisao`
+  - `nome_cc`
+- Somente eleitores dessas combinações poderão votar.
+
