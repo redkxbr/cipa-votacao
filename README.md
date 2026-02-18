@@ -97,3 +97,18 @@ Após voto:
 - Relatório de votos com filtro por código de sorteio e exportações CSV separadas:
   - votos
   - candidatos + total de votos
+
+
+## Importação de eleitores (CSV)
+- Tela: `admin/eleitores.php`
+- Clique em **Baixar modelo CSV** para usar o formato correto.
+- Colunas esperadas (ordem): `nome,cpf,empresa`.
+- Opções na tela:
+  - marcar/desmarcar se a 1ª linha é cabeçalho;
+  - escolher separador `,` ou `;`.
+- Arquivos XLS/XLSX: exporte para CSV antes da importação.
+
+Exemplo de cabeçalho:
+```csv
+nome,cpf,empresa
+```
