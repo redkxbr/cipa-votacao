@@ -2,10 +2,11 @@
 require_once __DIR__ . '/../includes/functions.php';
 
 $pdo = pdo();
-$candidates = $pdo->query('SELECT id, nome, cpf, foto_path FROM candidatos WHERE ativo = 1 ORDER BY nome')->fetchAll();
+$candidates = $pdo->query('SELECT id, nome, cpf, foto_path, turno, setor FROM candidatos WHERE ativo = 1 ORDER BY nome')->fetchAll();
 
+$turnos = ['1° Turno', '2° Turno', 'Comercial', 'Outro'];
 $data = [
-  'nome' => '', 'cpf' => '', 'telefone' => '', 'empresa' => '', 'setor' => '', 'candidato_id' => '', 'current_step' => '1'
+  'nome' => '', 'cpf' => '', 'turno' => '1° Turno', 'telefone' => '', 'empresa' => '', 'setor' => '', 'candidato_id' => '', 'current_step' => '1'
 ];
 $serverError = null;
 
@@ -20,6 +21,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if ($data['nome'] === '' || $cpf === '' || $phone === '' || $data['empresa'] === '' || $data['setor'] === '' || $data['candidato_id'] === '') {
     $serverError = 'Preencha todos os campos obrigatórios para concluir o voto.';
     $data['current_step'] = '4';
+  } elseif (!in_array($data['turno'], $turnos, true)) {
+    $serverError = 'Selecione um turno válido.';
+    $data['current_step'] = '2';
   } elseif (!validateCPF($cpf)) {
     $serverError = 'CPF inválido. Verifique e tente novamente.';
     $data['current_step'] = '2';
@@ -27,37 +31,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $serverError = 'Telefone inválido. Informe 10 ou 11 dígitos.';
     $data['current_step'] = '3';
   } else {
-    $check = $pdo->prepare('SELECT 1 FROM votos WHERE eleitor_cpf = :cpf LIMIT 1');
-    $check->execute(['cpf' => $cpf]);
-    if ($check->fetch()) {
-      $serverError = 'Este CPF já votou.';
+    $authorized = $pdo->prepare('SELECT nome, empresa FROM eleitores_autorizados WHERE cpf = :cpf LIMIT 1');
+    $authorized->execute(['cpf' => $cpf]);
+    $allowed = $authorized->fetch();
+    if (!$allowed) {
+      $serverError = 'Este CPF não está autorizado para votar. Procure o RH/SESMT.';
       $data['current_step'] = '2';
     } else {
-      try {
-        $pdo->beginTransaction();
-        $code = uniqueLotteryCode($pdo);
-        $token = bin2hex(random_bytes(16));
+      $check = $pdo->prepare('SELECT 1 FROM votos WHERE eleitor_cpf = :cpf LIMIT 1');
+      $check->execute(['cpf' => $cpf]);
+      if ($check->fetch()) {
+        $serverError = 'Este CPF já votou.';
+        $data['current_step'] = '2';
+      } else {
+        try {
+          $pdo->beginTransaction();
+          $code = uniqueLotteryCode($pdo);
+          $token = bin2hex(random_bytes(16));
 
-        $stmt = $pdo->prepare('INSERT INTO votos (eleitor_nome, eleitor_cpf, eleitor_telefone, eleitor_empresa, eleitor_setor, candidato_id, codigo_sorteio, token)
-                               VALUES (:n,:cpf,:t,:e,:s,:c,:code,:token)');
-        $stmt->execute([
-          'n' => $data['nome'],
-          'cpf' => $cpf,
-          't' => $phone,
-          'e' => $data['empresa'],
-          's' => $data['setor'],
-          'c' => (int)$data['candidato_id'],
-          'code' => $code,
-          'token' => $token,
-        ]);
-        $pdo->commit();
-        flash('success', 'Voto confirmado com sucesso!');
-        redirect(url('public/finalizar.php?token=' . urlencode($token)));
-      } catch (Throwable $e) {
-        if ($pdo->inTransaction()) {
-          $pdo->rollBack();
+          $stmt = $pdo->prepare('INSERT INTO votos (eleitor_nome, eleitor_cpf, eleitor_turno, eleitor_telefone, eleitor_empresa, eleitor_setor, candidato_id, codigo_sorteio, token)
+                                 VALUES (:n,:cpf,:turno,:t,:e,:s,:c,:code,:token)');
+          $stmt->execute([
+            'n' => $data['nome'],
+            'cpf' => $cpf,
+            'turno' => $data['turno'],
+            't' => $phone,
+            'e' => $data['empresa'],
+            's' => $data['setor'],
+            'c' => (int)$data['candidato_id'],
+            'code' => $code,
+            'token' => $token,
+          ]);
+          $pdo->commit();
+          flash('success', 'Voto confirmado com sucesso!');
+          redirect(url('public/finalizar.php?token=' . urlencode($token)));
+        } catch (Throwable $e) {
+          if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+          }
+          $serverError = ((int)$e->getCode() === 23000) ? 'Este CPF já votou.' : 'Não foi possível concluir seu voto agora.';
         }
-        $serverError = ((int)$e->getCode() === 23000) ? 'Este CPF já votou.' : 'Não foi possível concluir seu voto agora.';
       }
     }
   }
@@ -93,8 +106,15 @@ document.addEventListener('DOMContentLoaded',()=>Swal.fire({icon:'error',text:'<
     <section class="wizard-pane">
       <h3 class="h5">2) Identificação</h3>
       <div class="row g-3">
-        <div class="col-md-7"><label class="form-label">Nome*</label><input class="form-control" type="text" name="nome" value="<?= e($data['nome']) ?>"></div>
-        <div class="col-md-5"><label class="form-label">CPF*</label><input class="form-control" type="text" name="cpf" value="<?= e($data['cpf']) ?>" placeholder="000.000.000-00"></div>
+        <div class="col-md-6"><label class="form-label">Nome*</label><input class="form-control" type="text" name="nome" value="<?= e($data['nome']) ?>"></div>
+        <div class="col-md-3"><label class="form-label">CPF*</label><input class="form-control" type="text" name="cpf" value="<?= e($data['cpf']) ?>" placeholder="000.000.000-00"></div>
+        <div class="col-md-3"><label class="form-label">Turno*</label>
+          <select class="form-select" name="turno">
+            <?php foreach($turnos as $turno): ?>
+            <option value="<?= e($turno) ?>" <?= $data['turno'] === $turno ? 'selected' : '' ?>><?= e($turno) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
       </div>
       <div class="mt-3 d-flex gap-2 wizard-actions"><button type="button" class="btn btn-outline-secondary" data-prev>Voltar</button><button type="button" class="btn btn-friato" data-next>Continuar</button></div>
     </section>
@@ -122,6 +142,7 @@ document.addEventListener('DOMContentLoaded',()=>Swal.fire({icon:'error',text:'<
               <?php endif; ?>
               <div class="fw-semibold"><?= e($c['nome']) ?></div>
               <small class="text-muted">CPF: <?= e(maskCpfPublic($c['cpf'])) ?></small>
+              <small class="text-muted d-block">Turno: <?= e($c['turno']) ?> | Setor: <?= e($c['setor']) ?></small>
               <div class="form-check mt-2 d-flex justify-content-center">
                 <input class="form-check-input" type="radio" name="candidato_id" value="<?= (int)$c['id'] ?>" <?= $data['candidato_id'] === (string)$c['id'] ? 'checked' : '' ?>>
               </div>

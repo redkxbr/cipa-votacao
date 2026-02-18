@@ -32,6 +32,7 @@
       if (current === 2) {
         if (!req('input[name="nome"]', 'Informe seu nome.')) return;
         if (!req('input[name="cpf"]', 'Informe seu CPF.')) return;
+        if (!req('select[name="turno"]', 'Selecione seu turno.')) return;
       }
       if (current === 3) {
         if (!req('input[name="telefone"]', 'Informe seu telefone.')) return;

@@ -4,6 +4,7 @@ requireAdmin();
 $pdo = pdo();
 $errors = [];
 $editId = isset($_GET['edit']) && ctype_digit($_GET['edit']) ? (int)$_GET['edit'] : 0;
+$turnos = ['1° Turno', '2° Turno', 'Comercial', 'Outro'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = $_POST['action'] ?? '';
@@ -17,25 +18,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = ctype_digit($_POST['id'] ?? '') ? (int)$_POST['id'] : 0;
     $nome = trim((string)($_POST['nome'] ?? ''));
     $cpf = digits((string)($_POST['cpf'] ?? ''));
+    $turno = trim((string)($_POST['turno'] ?? 'Outro'));
+    $setor = trim((string)($_POST['setor'] ?? ''));
 
     if ($nome === '') $errors[] = 'Nome é obrigatório.';
     if (!validateCPF($cpf)) $errors[] = 'CPF inválido.';
+    if (!in_array($turno, $turnos, true)) $errors[] = 'Turno inválido.';
+    if ($setor === '') $errors[] = 'Setor é obrigatório.';
 
     if (!$errors) {
       try {
         if ($id > 0) {
           $old = $pdo->prepare('SELECT foto_path FROM candidatos WHERE id=:id');
-          $old->execute(['id'=>$id]);
+          $old->execute(['id' => $id]);
           $cand = $old->fetch();
           $foto = $cand['foto_path'] ?? null;
           if (!empty($_FILES['foto']['name'])) {
             $foto = uploadCandidatePhoto($_FILES['foto']);
           }
-          $pdo->prepare('UPDATE candidatos SET nome=:n, cpf=:c, foto_path=:f WHERE id=:id')->execute(['n'=>$nome,'c'=>$cpf,'f'=>$foto,'id'=>$id]);
+          $pdo->prepare('UPDATE candidatos SET nome=:n, cpf=:c, turno=:t, setor=:s, foto_path=:f WHERE id=:id')
+            ->execute(['n' => $nome, 'c' => $cpf, 't' => $turno, 's' => $setor, 'f' => $foto, 'id' => $id]);
           flash('success', 'Candidato atualizado.');
         } else {
           $foto = !empty($_FILES['foto']['name']) ? uploadCandidatePhoto($_FILES['foto']) : null;
-          $pdo->prepare('INSERT INTO candidatos (nome, cpf, foto_path, ativo) VALUES (:n,:c,:f,1)')->execute(['n'=>$nome,'c'=>$cpf,'f'=>$foto]);
+          $pdo->prepare('INSERT INTO candidatos (nome, cpf, turno, setor, foto_path, ativo) VALUES (:n,:c,:t,:s,:f,1)')
+            ->execute(['n' => $nome, 'c' => $cpf, 't' => $turno, 's' => $setor, 'f' => $foto]);
           flash('success', 'Candidato cadastrado.');
         }
         redirect(url('admin/candidatos.php'));
@@ -46,10 +53,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 }
 
-$editing = ['id'=>0,'nome'=>'','cpf'=>'','foto_path'=>''];
+$editing = ['id' => 0, 'nome' => '', 'cpf' => '', 'turno' => 'Outro', 'setor' => '', 'foto_path' => ''];
 if ($editId > 0) {
   $s = $pdo->prepare('SELECT * FROM candidatos WHERE id=:id');
-  $s->execute(['id'=>$editId]);
+  $s->execute(['id' => $editId]);
   $editing = $s->fetch() ?: $editing;
 }
 $list = $pdo->query('SELECT * FROM candidatos ORDER BY created_at DESC')->fetchAll();
@@ -71,6 +78,12 @@ require_once __DIR__ . '/../includes/header.php';
         <input type="hidden" name="id" value="<?= (int)$editing['id'] ?>">
         <input class="form-control" name="nome" placeholder="Nome" value="<?= e($editing['nome']) ?>" required>
         <input class="form-control" name="cpf" placeholder="CPF" value="<?= e($editing['cpf']) ?>" required>
+        <select class="form-select" name="turno" required>
+          <?php foreach($turnos as $t): ?>
+            <option value="<?= e($t) ?>" <?= $editing['turno'] === $t ? 'selected' : '' ?>><?= e($t) ?></option>
+          <?php endforeach; ?>
+        </select>
+        <input class="form-control" name="setor" placeholder="Setor" value="<?= e($editing['setor']) ?>" required>
         <input class="form-control" type="file" name="foto" accept="image/jpeg,image/png">
         <button class="btn btn-friato" type="submit">Salvar</button>
       </form>
@@ -79,13 +92,15 @@ require_once __DIR__ . '/../includes/header.php';
   <div class="col-lg-8">
     <div class="card p-3 table-responsive">
       <table class="table align-middle">
-        <thead><tr><th>Foto</th><th>Nome</th><th>CPF</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Foto</th><th>Nome</th><th>CPF</th><th>Turno</th><th>Setor</th><th>Status</th><th></th></tr></thead>
         <tbody>
           <?php foreach ($list as $c): ?>
           <tr>
             <td><?php if ($c['foto_path']): ?><img src="<?= e(url('public/uploads/candidatos/' . $c['foto_path'])) ?>" class="candidate-photo" alt="foto"><?php endif; ?></td>
             <td><?= e($c['nome']) ?></td>
             <td><?= e(formatCpf($c['cpf'])) ?></td>
+            <td><?= e($c['turno']) ?></td>
+            <td><?= e($c['setor']) ?></td>
             <td><span class="badge <?= (int)$c['ativo']===1 ? 'text-bg-success':'text-bg-secondary' ?>"><?= (int)$c['ativo']===1 ? 'Ativo':'Inativo' ?></span></td>
             <td>
               <a class="btn btn-sm btn-outline-primary" href="<?= e(url('admin/candidatos.php?edit=' . (int)$c['id'])) ?>">Editar</a>
