@@ -5,8 +5,8 @@ require_once __DIR__ . '/../includes/header.php';
   <div class="col-lg-7">
     <div class="card hero-card p-4 p-lg-5 h-100">
       <div class="d-flex gap-3 align-items-center mb-4">
-        <?= logoOrPlaceholder('logo-friato.png', 'Logo Friato', 'logo-hero') ?>
-        <?= logoOrPlaceholder('logo-cipa.png', 'Logo CIPA', 'logo-hero') ?>
+        <img height="70px" src="/cipa/public/assets/img/logo-friato-red.png" alt="Logo Friato">
+        <img height="70px" src="/cipa/public/assets/img/logo-cipa.png" alt="Logo CIPA">
       </div>
       <h1 class="hero-title display-5 mb-3">Votação CIPA – Friato</h1>
       <p class="text-secondary fs-5">Participe do processo eleitoral interno com um fluxo rápido, seguro e transparente.</p>
