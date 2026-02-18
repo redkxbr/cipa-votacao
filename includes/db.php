@@ -10,7 +10,7 @@ const DB_HOST = '127.0.0.1';
 const DB_NAME = 'cipa_votacao';
 const DB_USER = 'root';
 const DB_PASS = '';
-const BASE_URL = '/cipa';
+const BASE_URL = '/cipa-votacao';
 const MAX_UPLOAD_SIZE = 2097152;
 const FINAL_MESSAGE = 'Os dados informados foram registrados. O SESMT entrará em contato pelo telefone informado caso haja ausência no dia do sorteio.';
 

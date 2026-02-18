@@ -26,7 +26,9 @@ Sistema de votação com UI moderna, wizard/stepper em 4 etapas, área administr
   logout.php
   dashboard.php
   candidatos.php
+  eleitores.php
   votos.php
+  sorteio.php
 /includes
   header.php
   footer.php
@@ -60,7 +62,7 @@ README.md
 
 ## Fluxo de votação (wizard)
 1. Instruções
-2. Identificação (nome + CPF)
+2. Identificação (nome + CPF + turno)
 3. Contato e lotação (telefone, empresa, setor)
 4. Escolha de 1 candidato + confirmação
 
@@ -86,3 +88,12 @@ Após voto:
 ## Personalização rápida
 - Texto da página final: constante `FINAL_MESSAGE` em `includes/db.php`.
 - Cores da marca: variáveis CSS em `public/assets/css/style.css`.
+
+## Regras adicionais implementadas
+- Apenas eleitores importados em `eleitores_autorizados` podem votar.
+- Importação de eleitores via CSV no admin (`nome,cpf,empresa`).
+- Cadastro de candidatos com campos extras: `turno` e `setor`.
+- Página de sorteio no admin para selecionar aleatoriamente um votante pelo código.
+- Relatório de votos com filtro por código de sorteio e exportações CSV separadas:
+  - votos
+  - candidatos + total de votos
