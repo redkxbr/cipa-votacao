@@ -110,7 +110,7 @@ require_once __DIR__ . '/../includes/header.php';
 <div class="card p-3 table-responsive">
   <h2 class="h5">Eleições criadas</h2>
   <table class="table table-hover align-middle">
-    <thead><tr><th>Nome</th><th>Período</th><th>Votos</th><th>Link de votação</th></tr></thead>
+    <thead><tr><th>Nome</th><th>Período</th><th>Votos</th><th>Link de votação</th><th>Ações</th></tr></thead>
     <tbody>
       <?php foreach($list as $e): ?>
       <tr>
@@ -120,6 +120,10 @@ require_once __DIR__ . '/../includes/header.php';
         <td>
           <?php $link = url('public/votar.php?eleicao=' . urlencode($e['slug'])); ?>
           <input class="form-control form-control-sm" value="<?= e($link) ?>" readonly onclick="this.select();">
+        </td>
+        <td class="text-nowrap">
+          <a class="btn btn-sm btn-outline-primary" href="<?= e(url('admin/eleicao_editar.php?id=' . (int)$e['id'])) ?>">Editar</a>
+          <a class="btn btn-sm btn-outline-danger" href="<?= e(url('admin/eleicao_excluir.php?id=' . (int)$e['id'])) ?>">Excluir</a>
         </td>
       </tr>
       <?php endforeach; ?>

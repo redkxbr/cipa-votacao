@@ -28,6 +28,8 @@ Sistema de votação com UI moderna, wizard/stepper em 4 etapas, área administr
   candidatos.php
   eleitores.php
   eleicoes.php
+  eleicao_editar.php
+  eleicao_excluir.php
   votos.php
   sorteio.php
 /includes
@@ -118,6 +120,7 @@ nome,cpf,empresa,gerencia,supervisao,nome_cc
 
 ## Gestão de Eleições (novo)
 - Crie eleições em `admin/eleicoes.php` com:
+  - editar e excluir eleições pelas páginas dedicadas (`eleicao_editar.php` e `eleicao_excluir.php`)
   - nome (ex.: Eleição CIPA Friato 2026)
   - período início/fim
   - descrição pública
