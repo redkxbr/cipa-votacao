@@ -127,9 +127,10 @@ nome,cpf,empresa,gerencia,supervisao,nome_cc
   - justificativa para não elegíveis
 - Ao criar, o sistema gera um **link de compartilhamento** com slug, ex:
   - `public/votar.php?eleicao=eleicao-cipa-friato-2026`
-- Permissões da eleição podem ser definidas por grupos de eleitores:
+- Permissões da eleição podem ser definidas por grupos de eleitores, por níveis (cascata):
   - `gerencia`
-  - `supervisao`
-  - `nome_cc`
+  - `supervisao` (filtra conforme gerências selecionadas)
+  - `nome_cc` (filtra conforme gerência + supervisão)
+- Interface usa seletor em dois lados (disponíveis x selecionados) para evitar combinações incoerentes.
 - Somente eleitores dessas combinações poderão votar.
 
