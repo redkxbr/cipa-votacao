@@ -124,7 +124,7 @@ require_once __DIR__ . '/../includes/header.php';
     <div class="col-12"><label class="form-label">Descrição/Texto público</label><textarea class="form-control" name="descricao" rows="2"><?= e($eleicao['descricao'] ?? '') ?></textarea></div>
     <div class="col-12"><label class="form-label">Justificativa quando CPF não tiver permissão</label><textarea class="form-control" name="justificativa_negacao" rows="2"><?= e($eleicao['justificativa_negacao'] ?? '') ?></textarea></div>
 
-    <div class="col-md-4">
+    <div class="col-12">
       <label class="form-label">Gerência permitida</label>
       <div class="row g-2">
         <div class="col-5"><select id="gerencia_left" class="form-select" multiple size="12"></select></div>
@@ -135,7 +135,7 @@ require_once __DIR__ . '/../includes/header.php';
       <select name="gerencia[]" id="gerencia_hidden" multiple class="d-none"></select>
     </div>
 
-    <div class="col-md-4">
+    <div class="col-12">
       <label class="form-label">Supervisão permitida</label>
       <div class="row g-2">
         <div class="col-5"><select id="supervisao_left" class="form-select" multiple size="12"></select></div>
@@ -146,7 +146,7 @@ require_once __DIR__ . '/../includes/header.php';
       <select name="supervisao[]" id="supervisao_hidden" multiple class="d-none"></select>
     </div>
 
-    <div class="col-md-4">
+    <div class="col-12">
       <label class="form-label">Nome CC permitido</label>
       <div class="row g-2">
         <div class="col-5"><select id="nomecc_left" class="form-select" multiple size="12"></select></div>
