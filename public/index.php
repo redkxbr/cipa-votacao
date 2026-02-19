@@ -9,7 +9,7 @@ require_once __DIR__ . '/../includes/header.php';
   <div class="col-lg-7">
     <div class="card hero-card p-4 p-lg-5 h-100">
       <div class="d-flex gap-3 align-items-center mb-4">
-        <?= logoOrPlaceholder('logo-friato.png', 'Logo Friato', 'logo-hero') ?>
+        <?= logoOrPlaceholder('logo-friato-red.png', 'Logo Friato', 'logo-hero') ?>
         <?= logoOrPlaceholder('logo-cipa.png', 'Logo CIPA', 'logo-hero') ?>
       </div>
       <span class="chip mb-3"><i class="bi bi-shield-check"></i> Eleição interna segura</span>
