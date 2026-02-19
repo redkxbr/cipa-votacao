@@ -58,7 +58,7 @@ body {
   border: 1px dashed #fecaca;
   border-radius: 12px;
 }
-.logo-hero { width: 100%; max-width: 138px; height: 74px; }
+.logo-hero { max-width: 138px; height: 74px; }
 
 .surface-red {
   background: linear-gradient(165deg, #ffffff 0%, #fff4f2 100%);
