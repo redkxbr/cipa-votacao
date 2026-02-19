@@ -55,7 +55,7 @@ body {
   justify-content:center;
   background: #fff;
   color: var(--neutral-700);
-  border: 1px dashed #fecaca;
+  border: 1px dashed #fecaca; 
   border-radius: 12px;
 }
 .logo-hero { max-width: 138px; height: 74px; }
